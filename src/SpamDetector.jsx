@@ -1,5 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
+const BASE_URL = "https://smishingdet-functions.azurewebsites.net/api";
+
+/*
 const MOCK_RESULTS = {
   spam: {
     result: "spam",
@@ -21,18 +24,27 @@ const MOCK_RESULTS = {
   },
 };
 
+
 const HISTORY = [
   { id: 1, preview: "엄마 나 폰 고장나서...", result: "spam", time: "14:23" },
   { id: 2, preview: "택배 배송 완료 안내입니다", result: "safe", time: "13:11" },
   { id: 3, preview: "계좌 이체 요청드립니다", result: "suspicious", time: "11:47" },
   { id: 4, preview: "[이벤트] 당첨되셨습니다!", result: "spam", time: "10:02" },
 ];
+*/
 
 const VERDICT = {
   spam: { label: "스팸 / 피싱", color: "#ff4444", bg: "rgba(255,68,68,0.08)", icon: "⚠" },
   suspicious: { label: "의심", color: "#ffaa00", bg: "rgba(255,170,0,0.08)", icon: "?" },
-  safe: { label: "정상", color: "#00e5a0", bg: "rgba(0,229,160,0.08)", icon: "✓" },
+  normal: { label: "정상", color: "#00e5a0", bg: "rgba(0,229,160,0.08)", icon: "✓" },
 };
+
+function formatTime(iso) {
+  if (!iso) return "";
+  iso = iso.replace(" ", "T") + "Z";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" });
+}
 
 export default function SpamDetector() {
   const [tab, setTab] = useState("text");
@@ -41,8 +53,20 @@ export default function SpamDetector() {
   const [imagePreview, setImagePreview] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
   const [activeHistory, setActiveHistory] = useState(null);
   const fileRef = useRef();
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/history`);
+      const data = await res.json();
+      setHistory(data.items || []);
+    } catch {
+    }
+  };
+
+  useEffect(() => { fetchHistory(); }, []);
 
   const handleImageDrop = (e) => {
     e.preventDefault();
@@ -52,26 +76,39 @@ export default function SpamDetector() {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  // parse text or image to back-end
-  const analyze = async () => {
+const analyze = async () => {
   if (tab === "text" && !text.trim()) return;
   if (tab === "image" && !image) return;
   setAnalyzing(true);
   setResult(null);
 
   try {
-    const body = tab === "text"
-      ? { type: "text", content: text }
-      : { type: "image", content: await toBase64(image) };
+    let res;
 
-    const res = await fetch("https://<Azure Functions URL>/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    if (tab === "text") {
+      // 텍스트: JSON으로 전송
+      res = await fetch(`${BASE_URL}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text }),
+      });
+
+    } else {
+      // 이미지: FormData로 전송
+      const formData = new FormData();
+      formData.append("type", "image");
+      formData.append("file", image);
+
+      res = await fetch(`${BASE_URL}/analyze`, {
+        method: "POST",
+        body: formData,
+      });
+    }
 
     const data = await res.json();
     setResult(data);
+    fetchHistory();
+
   } catch (err) {
     console.error(err);
   } finally {
@@ -79,15 +116,7 @@ export default function SpamDetector() {
   }
 };
 
-// 이미지 base64 변환 헬퍼
-const toBase64 = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result.split(",")[1]);
-  reader.onerror = reject;
-  reader.readAsDataURL(file);
-});
-
-  const verdict = result ? VERDICT[result.result] : null;
+  const verdict = result ? VERDICT[result.label] ?? VERDICT.normal : null;
 
   return (
     <div style={{
@@ -230,7 +259,7 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.04em", color: "#d0daf0" }}>
-            피싱 문자 판독
+            피싱 문자 판별
           </span>
         </div>
       </header>
@@ -249,26 +278,29 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
           <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 14 }}>
             RECENT HISTORY
           </div>
-          {HISTORY.map(h => (
-            <div
-              key={h.id}
-              className={`history-item${activeHistory === h.id ? " active" : ""}`}
-              onClick={() => setActiveHistory(h.id)}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <span style={{
-                  fontSize: 10,
-                  fontFamily: "'Space Mono', monospace",
-                  color: VERDICT[h.result].color,
-                  opacity: 0.8,
-                }}>{VERDICT[h.result].label}</span>
-                <span style={{ fontSize: 10, color: "#3a4860" }}>{h.time}</span>
+          {history.length === 0 && (
+            <div style={{ fontSize: 11, color: "#2a3550", textAlign: "center", marginTop: 20 }}>이력 없음</div>
+          )}
+          {history.map(h => {
+            const v = VERDICT[h.label] ?? VERDICT.normal;
+            return (
+              <div
+                key={h.id}
+                className={`history-item${activeHistory === h.id ? " active" : ""}`}
+                onClick={() => setActiveHistory(h.id)}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: v.color, opacity: 0.8 }}>
+                    {v.label}
+                  </span>
+                  <span style={{ fontSize: 10, color: "#3a4860" }}>{formatTime(h.created_at)}</span>
+                </div>
+                <div style={{ fontSize: 12, color: "#6a7890", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {h.original_text || `[${h.input_type}]`}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: "#6a7890", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {h.preview}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </aside>
 
         {/* Center */}
@@ -349,7 +381,7 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
                   <>
                     <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>📷</div>
                     <p style={{ fontSize: 14, color: "#4a5870", marginBottom: 4 }}>이미지를 드래그하거나 클릭하여 업로드</p>
-                    <p style={{ fontSize: 12, color: "#2a3550" }}>PNG, JPG, JPEG 지원 · Azure AI Vision으로 OCR 처리</p>
+                    <p style={{ fontSize: 12, color: "#2a3550" }}>PNG, JPG, JPEG 지원</p>
                   </>
                 )}
               </div>
@@ -373,7 +405,7 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
             {analyzing && (
               <div style={{ marginTop: 24, padding: "20px", background: "#0d1118", border: "1px solid #1a2535", borderRadius: 12, textAlign: "center" }}>
                 <div style={{ fontSize: 12, color: "#3a5080", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace" }}>
-                  AI 파이프라인 분석 중...
+                  AI 분석 중...
                 </div>
                 <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
                   {["전처리", "KLUE-BERT", "Azure AI", "종합 판정"].map((s, i) => (
@@ -450,36 +482,17 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
                   </div>
                 </div>
 
-                {/* Details */}
+                {/* reason 배열 */}
                 <div style={{ padding: "18px 24px", background: "#0a0e16" }}>
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-                      REASON
-                    </div>
-                    <div style={{ fontSize: 13, color: "#8090a8", lineHeight: 1.7 }}>
-                      {result.reason}
-                    </div>
+                  <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                    REASON
                   </div>
-
-                  {result.keywords.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                        KEYWORDS
-                      </div>
-                      <div>
-                        {result.keywords.map(k => (
-                          <span
-                            key={k}
-                            className="keyword-tag"
-                            style={{
-                              background: `${verdict.color}12`,
-                              border: `1px solid ${verdict.color}30`,
-                              color: verdict.color,
-                            }}
-                          >{k}</span>
-                        ))}
-                      </div>
-                    </div>
+                  {result.reason && result.reason.length > 0 ? (
+                    result.reason.map((r, i) => (
+                      <div key={i} style={{ fontSize: 13, color: "#8090a8", lineHeight: 1.7 }}>• {r}</div>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#3a4860" }}>탐지된 이유 없음 (AI 모델 연결 대기 중)</div>
                   )}
                 </div>
 
@@ -491,26 +504,6 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
                   display: "flex",
                   gap: 10,
                 }}>
-                  <button style={{
-                    padding: "8px 16px",
-                    borderRadius: 6,
-                    border: "1px solid #1e2838",
-                    background: "transparent",
-                    color: "#5a6880",
-                    fontSize: 12,
-                    fontFamily: "inherit",
-                    cursor: "pointer",
-                  }}>이력 저장</button>
-                  <button style={{
-                    padding: "8px 16px",
-                    borderRadius: 6,
-                    border: "1px solid #1e2838",
-                    background: "transparent",
-                    color: "#5a6880",
-                    fontSize: 12,
-                    fontFamily: "inherit",
-                    cursor: "pointer",
-                  }}>신고하기</button>
                   <button
                     onClick={() => { setResult(null); setText(""); setImage(null); setImagePreview(null); }}
                     style={{
