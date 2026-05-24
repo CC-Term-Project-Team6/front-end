@@ -2,37 +2,6 @@ import { useState, useRef, useEffect } from "react";
 
 const BASE_URL = "https://smishingdet-functions.azurewebsites.net/api";
 
-/*
-const MOCK_RESULTS = {
-  spam: {
-    result: "spam",
-    confidence: 0.97,
-    reason: "가족 사칭 스미싱 패턴 감지됨. 금전 요청 및 긴급 상황 유도 문구 포함.",
-    keywords: ["폰 고장", "상품권", "급해", "엄마"],
-  },
-  suspicious: {
-    result: "suspicious",
-    confidence: 0.61,
-    reason: "의심스러운 URL 포함. 발신자 정보 불명확. 추가 확인 권장.",
-    keywords: ["링크 클릭", "본인 인증", "이벤트 당첨"],
-  },
-  safe: {
-    result: "safe",
-    confidence: 0.94,
-    reason: "정상적인 메시지 패턴. 스팸/피싱 특징 미감지.",
-    keywords: [],
-  },
-};
-
-
-const HISTORY = [
-  { id: 1, preview: "엄마 나 폰 고장나서...", result: "spam", time: "14:23" },
-  { id: 2, preview: "택배 배송 완료 안내입니다", result: "safe", time: "13:11" },
-  { id: 3, preview: "계좌 이체 요청드립니다", result: "suspicious", time: "11:47" },
-  { id: 4, preview: "[이벤트] 당첨되셨습니다!", result: "spam", time: "10:02" },
-];
-*/
-
 const VERDICT = {
   spam: { label: "스팸 / 피싱", color: "#ff4444", bg: "rgba(255,68,68,0.08)", icon: "⚠" },
   suspicious: { label: "의심", color: "#ffaa00", bg: "rgba(255,170,0,0.08)", icon: "?" },
@@ -55,6 +24,7 @@ export default function SpamDetector() {
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [activeHistory, setActiveHistory] = useState(null);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
   const fileRef = useRef();
 
   const fetchHistory = async () => {
@@ -72,55 +42,67 @@ export default function SpamDetector() {
     e.preventDefault();
     const file = e.dataTransfer?.files[0] || e.target.files[0];
     if (!file) return;
+    resetAll();
     setImage(file);
     setImagePreview(URL.createObjectURL(file));
   };
 
-const analyze = async () => {
-  if (tab === "text" && !text.trim()) return;
-  if (tab === "image" && !image) return;
-  setAnalyzing(true);
-  setResult(null);
+  const analyze = async () => {
+    if (tab === "text" && !text.trim()) return;
+    if (tab === "image" && !image) return;
+    resetAll();
+    setAnalyzing(true);
 
-  try {
-    let res;
-
-    if (tab === "text") {
-      // 텍스트: JSON으로 전송
-      res = await fetch(`${BASE_URL}/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text }),
-      });
-
-    } else {
-      // 이미지: FormData로 전송
-      const formData = new FormData();
-      formData.append("type", "image");
-      formData.append("file", image);
-
-      res = await fetch(`${BASE_URL}/analyze`, {
-        method: "POST",
-        body: formData,
-      });
+    try {
+      let res;
+      if (tab === "text") {
+        res = await fetch(`${BASE_URL}/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: text }),
+        });
+      } else {
+        const formData = new FormData();
+        formData.append("type", "image");
+        formData.append("file", image);
+        res = await fetch(`${BASE_URL}/analyze`, {
+          method: "POST",
+          body: formData,
+        });
+      }
+      const data = await res.json();
+      setResult(data);
+      fetchHistory();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAnalyzing(false);
     }
+  };
 
-    const data = await res.json();
-    setResult(data);
-    fetchHistory();
+  const handleHistoryClick = (historyItem) => {
+    resetAll();
+    setActiveHistory(historyItem.id);
+    setSelectedHistoryItem(historyItem);
+  };
 
-  } catch (err) {
-    console.error(err);
-  } finally {
+  const resetAll = () => {
+    setResult(null);
+    // setText(""); // Do not reset text on history click
+    setImage(null);
+    setImagePreview(null);
+    setActiveHistory(null);
+    setSelectedHistoryItem(null);
     setAnalyzing(false);
-  }
-};
+  };
 
   const verdict = result ? VERDICT[result.label] ?? VERDICT.normal : null;
+  const historyVerdict = selectedHistoryItem ? VERDICT[selectedHistoryItem.label] ?? VERDICT.normal : null;
 
   return (
     <div style={{
-      minHeight: "100vh",
+      height: "100vh",
+      overflow: "hidden",
       background: "#0a0c10",
       color: "#e0e6f0",
       fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif",
@@ -128,6 +110,7 @@ const analyze = async () => {
       flexDirection: "column",
     }}>
       <style>{`
+        /* Styles remain unchanged */
         @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; }
@@ -243,7 +226,6 @@ const analyze = async () => {
         }
       `}</style>
 
-      {/* Header */}
       <header style={{
         borderBottom: "1px solid #161c28",
         padding: "0 32px",
@@ -264,10 +246,7 @@ const analyze = async () => {
         </div>
       </header>
 
-      {/* Main */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-
-        {/* Sidebar */}
         <aside style={{
           width: 220,
           borderRight: "1px solid #161c28",
@@ -276,7 +255,7 @@ const analyze = async () => {
           flexShrink: 0,
         }}>
           <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 14 }}>
-            RECENT HISTORY
+            최근 분석 이력
           </div>
           {history.length === 0 && (
             <div style={{ fontSize: 11, color: "#2a3550", textAlign: "center", marginTop: 20 }}>이력 없음</div>
@@ -287,7 +266,7 @@ const analyze = async () => {
               <div
                 key={h.id}
                 className={`history-item${activeHistory === h.id ? " active" : ""}`}
-                onClick={() => setActiveHistory(h.id)}
+                onClick={() => handleHistoryClick(h)}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: v.color, opacity: 0.8 }}>
@@ -303,232 +282,228 @@ const analyze = async () => {
           })}
         </aside>
 
-        {/* Center */}
         <main style={{ flex: 1, padding: "32px 40px", overflow: "auto", position: "relative" }}>
           <div className="grid-bg" />
-
-          <div style={{ maxWidth: 640, margin: "0 auto", position: "relative" }}>
-            <h1 style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: "#c8d6f0",
-              marginBottom: 6,
-              letterSpacing: "-0.01em",
-            }}>메시지 분석</h1>
-            <p style={{ fontSize: 13, color: "#4a5870", marginBottom: 28, lineHeight: 1.6 }}>
-              의심스러운 문자·메시지를 붙여넣거나 스크린샷을 업로드하세요.
-            </p>
-
-            {/* Tab */}
-            <div style={{
-              display: "flex",
-              gap: 6,
-              background: "#0d1118",
-              border: "1px solid #1a2030",
-              borderRadius: 8,
-              padding: 4,
-              marginBottom: 20,
-              width: "fit-content",
-            }}>
-              <button className={`tab-btn${tab === "text" ? " active" : ""}`} onClick={() => setTab("text")}>
-                ✏ 텍스트 입력
-              </button>
-              <button className={`tab-btn${tab === "image" ? " active" : ""}`} onClick={() => setTab("image")}>
-                🖼 이미지 업로드
-              </button>
-            </div>
-
-            {/* Input area */}
-            {tab === "text" ? (
-              <textarea
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder="분석할 메시지를 붙여넣으세요..."
-                rows={7}
-                style={{
-                  width: "100%",
-                  background: "#0d1118",
-                  border: "1px solid #1e2838",
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  color: "#c0cce0",
-                  fontSize: 14,
-                  fontFamily: "'Noto Sans KR', sans-serif",
-                  resize: "vertical",
-                  outline: "none",
-                  lineHeight: 1.8,
-                  transition: "border-color 0.2s",
-                  marginBottom: 16,
-                }}
-                onFocus={e => e.target.style.borderColor = "#2a4080"}
-                onBlur={e => e.target.style.borderColor = "#1e2838"}
-              />
-            ) : (
-              <div
-                className="drop-zone"
-                style={{ marginBottom: 16 }}
-                onClick={() => fileRef.current?.click()}
-                onDragOver={e => e.preventDefault()}
-                onDrop={handleImageDrop}
-              >
-                <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageDrop} />
-                {imagePreview ? (
-                  <div>
-                    <img src={imagePreview} alt="preview" style={{ maxHeight: 180, borderRadius: 6, marginBottom: 10 }} />
-                    <p style={{ fontSize: 12, color: "#4a5870" }}>{image?.name}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>📷</div>
-                    <p style={{ fontSize: 14, color: "#4a5870", marginBottom: 4 }}>이미지를 드래그하거나 클릭하여 업로드</p>
-                    <p style={{ fontSize: 12, color: "#2a3550" }}>PNG, JPG, JPEG 지원</p>
-                  </>
-                )}
-              </div>
-            )}
-
-            <button
-              className="analyze-btn"
-              onClick={analyze}
-              disabled={analyzing || (tab === "text" ? !text.trim() : !image)}
-            >
-              {analyzing ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                  <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                  분석 중...
-                </span>
-              ) : "분석 시작 →"}
-              {analyzing && <span className="scan-line" />}
-            </button>
-
-            {/* Result */}
-            {analyzing && (
-              <div style={{ marginTop: 24, padding: "20px", background: "#0d1118", border: "1px solid #1a2535", borderRadius: 12, textAlign: "center" }}>
-                <div style={{ fontSize: 12, color: "#3a5080", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace" }}>
-                  AI 분석 중...
-                </div>
-                <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
-                  {["전처리", "KLUE-BERT", "Azure AI", "종합 판정"].map((s, i) => (
-                    <div key={s} style={{
-                      fontSize: 10,
-                      padding: "4px 10px",
-                      borderRadius: 4,
-                      background: "#111820",
+          <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative" }}>
+            {selectedHistoryItem ? (
+              <div className="result-card" style={{animation: 'fadeIn 0.3s ease-out'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24}}>
+                   <h1 style={{ fontSize: 22, fontWeight: 700, color: "#c8d6f0", letterSpacing: "-0.01em" }}>
+                      분석 이력 상세
+                    </h1>
+                  <button
+                    onClick={() => { setSelectedHistoryItem(null); setActiveHistory(null); }}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 6,
                       border: "1px solid #1e2838",
-                      color: "#3a5070",
-                      animation: `fadeIn 0.3s ${i * 0.25}s both`,
-                    }}>{s}</div>
-                  ))}
+                      background: "#0d1118",
+                      color: "#8090a8",
+                      fontSize: 12,
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                      transition: 'all 0.2s'
+                    }}>← 뒤로가기</button>
                 </div>
-              </div>
-            )}
 
-            {result && !analyzing && (
-              <div
-                className="result-card"
-                style={{
-                  marginTop: 24,
-                  background: verdict.bg,
-                  border: `1px solid ${verdict.color}30`,
-                  borderRadius: 12,
-                  overflow: "hidden",
-                }}
-              >
                 {/* Verdict header */}
                 <div style={{
                   padding: "18px 24px",
-                  borderBottom: `1px solid ${verdict.color}20`,
+                  background: `${historyVerdict.bg}20`,
+                  border: `1px solid ${historyVerdict.color}30`,
+                  borderRadius: 12,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  marginBottom: 16
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <span style={{
                       width: 36, height: 36,
                       borderRadius: "50%",
-                      background: `${verdict.color}15`,
-                      border: `2px solid ${verdict.color}40`,
+                      background: `${historyVerdict.color}15`,
+                      border: `2px solid ${historyVerdict.color}40`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 16,
-                      color: verdict.color,
+                      color: historyVerdict.color,
                       fontFamily: "'Space Mono', monospace",
                       fontWeight: 700,
-                    }}>{verdict.icon}</span>
+                    }}>{historyVerdict.icon}</span>
                     <div>
-                      <div style={{ fontSize: 17, fontWeight: 700, color: verdict.color, letterSpacing: "0.02em" }}>
-                        {verdict.label}
+                      <div style={{ fontSize: 17, fontWeight: 700, color: historyVerdict.color, letterSpacing: "0.02em" }}>
+                        {historyVerdict.label}
                       </div>
-                      <div style={{ fontSize: 11, color: "#4a5870", marginTop: 1 }}>판정 완료</div>
+                      <div style={{ fontSize: 11, color: "#4a5870", marginTop: 1 }}>
+                        {formatTime(selectedHistoryItem.created_at)} 분석됨
+                      </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{
-                      fontSize: 28,
-                      fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace",
-                      color: verdict.color,
-                    }}>{Math.round(result.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span></div>
-                    <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.1em" }}>CONFIDENCE</div>
-                  </div>
-                </div>
-
-                {/* Confidence bar */}
-                <div style={{ padding: "12px 24px 0", background: "#0a0e16" }}>
-                  <div style={{ height: 4, background: "#1a2030", borderRadius: 3, overflow: "hidden" }}>
-                    <div
-                      className="confidence-bar-fill"
-                      style={{ width: `${result.confidence * 100}%`, background: verdict.color }}
-                    />
-                  </div>
-                </div>
-
-                {/* reason 배열 */}
-                <div style={{ padding: "18px 24px", background: "#0a0e16" }}>
-                  <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                    REASON
-                  </div>
-                  {result.reason && result.reason.length > 0 ? (
-                    result.reason.map((r, i) => (
-                      <div key={i} style={{ fontSize: 13, color: "#8090a8", lineHeight: 1.7 }}>• {r}</div>
-                    ))
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#3a4860" }}>탐지된 이유 없음 (AI 모델 연결 대기 중)</div>
+                  {typeof selectedHistoryItem.confidence === 'number' && (
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{
+                        fontSize: 28,
+                        fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace",
+                        color: historyVerdict.color,
+                      }}>{Math.round(selectedHistoryItem.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span></div>
+                      <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.1em" }}>CONFIDENCE</div>
+                    </div>
                   )}
                 </div>
 
-                {/* Actions */}
+                {/* Original Text */}
+                <h2 style={{fontSize: 11, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 8, marginTop: 24}}>
+                  원본 메시지
+                </h2>
                 <div style={{
-                  padding: "12px 24px",
-                  background: "#080b12",
-                  borderTop: "1px solid #161c28",
-                  display: "flex",
-                  gap: 10,
+                  background: "#0d1118",
+                  border: "1px solid #1e2838",
+                  borderRadius: 10,
+                  padding: "16px 18px",
+                  color: "#90a0b8",
+                  fontSize: 14,
+                  lineHeight: 1.8,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  maxHeight: 200,
+                  overflow: 'auto'
                 }}>
-                  <button
-                    onClick={() => { setResult(null); setText(""); setImage(null); setImagePreview(null); }}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: 6,
-                      border: "1px solid #1e2838",
-                      background: "transparent",
-                      color: "#5a6880",
-                      fontSize: 12,
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                      marginLeft: "auto",
-                    }}>초기화</button>
+                  {selectedHistoryItem.original_text || `[이미지 파일] - 분석 당시 파일명: ${selectedHistoryItem.input_type}`}
+                </div>
+
+                {/* Reason */}
+                <h2 style={{fontSize: 11, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 8, marginTop: 24}}>
+                  분석 이유
+                </h2>
+                <div style={{
+                  background: "#0d1118",
+                  border: "1px solid #1e2838",
+                  borderRadius: 10,
+                  padding: "18px 24px",
+                }}>
+                  {selectedHistoryItem.reason && selectedHistoryItem.reason.length > 0 && selectedHistoryItem.reason[0] !== "특별한 위험 신호 없음" ? (
+                    selectedHistoryItem.reason.map((r, i) => (
+                      <div key={i} style={{ fontSize: 13, color: "#8090a8", lineHeight: 1.7, marginBottom: i === selectedHistoryItem.reason.length - 1 ? 0 : 8 }}>• {r}</div>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#3a4860" }}>특별한 위험 요소가 탐지되지 않았습니다.</div>
+                  )}
                 </div>
               </div>
+            ) : (
+              <>
+                <h1 style={{ fontSize: 22, fontWeight: 700, color: "#c8d6f0", marginBottom: 6, letterSpacing: "-0.01em" }}>
+                  메시지 분석
+                </h1>
+                <p style={{ fontSize: 13, color: "#4a5870", marginBottom: 28, lineHeight: 1.6 }}>
+                  의심스러운 문자·메시지를 붙여넣거나 스크린샷을 업로드하세요.
+                </p>
+
+                <div style={{ display: "flex", gap: 6, background: "#0d1118", border: "1px solid #1a2030", borderRadius: 8, padding: 4, marginBottom: 20, width: "fit-content" }}>
+                  <button className={`tab-btn${tab === "text" ? " active" : ""}`} onClick={() => setTab("text")}>
+                    ✏ 텍스트 입력
+                  </button>
+                  <button className={`tab-btn${tab === "image" ? " active" : ""}`} onClick={() => setTab("image")}>
+                    🖼 이미지 업로드
+                  </button>
+                </div>
+
+                {tab === "text" ? (
+                  <textarea
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    placeholder="분석할 메시지를 붙여넣으세요..."
+                    rows={7}
+                    style={{ width: "100%", background: "#0d1118", border: "1px solid #1e2838", borderRadius: 10, padding: "16px 18px", color: "#c0cce0", fontSize: 14, fontFamily: "'Noto Sans KR', sans-serif", resize: "vertical", outline: "none", lineHeight: 1.8, transition: "border-color 0.2s", marginBottom: 16 }}
+                    onFocus={e => e.target.style.borderColor = "#2a4080"}
+                    onBlur={e => e.target.style.borderColor = "#1e2838"}
+                  />
+                ) : (
+                  <div className="drop-zone" style={{ marginBottom: 16 }} onClick={() => fileRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={handleImageDrop}>
+                    <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageDrop} />
+                    {imagePreview ? (
+                      <div>
+                        <img src={imagePreview} alt="preview" style={{ maxHeight: 180, borderRadius: 6, marginBottom: 10 }} />
+                        <p style={{ fontSize: 12, color: "#4a5870" }}>{image?.name}</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>📷</div>
+                        <p style={{ fontSize: 14, color: "#4a5870", marginBottom: 4 }}>이미지를 드래그하거나 클릭하여 업로드</p>
+                        <p style={{ fontSize: 12, color: "#2a3550" }}>PNG, JPG, JPEG 지원</p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <button className="analyze-btn" onClick={analyze} disabled={analyzing || (tab === "text" ? !text.trim() : !image)}>
+                  {analyzing ? "분석 중..." : "분석 시작 →"}
+                </button>
+
+                {analyzing && (
+                  <div style={{ marginTop: 24, padding: "20px", background: "#0d1118", border: "1px solid #1a2535", borderRadius: 12, textAlign: "center" }}>
+                    AI 분석 중...
+                  </div>
+                )}
+
+                {result && !analyzing && (
+                  <div className="result-card" style={{ marginTop: 24, background: verdict.bg, border: `1px solid ${verdict.color}30`, borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ padding: "18px 24px", borderBottom: `1px solid ${verdict.color}20`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ width: 36, height: 36, borderRadius: "50%", background: `${verdict.color}15`, border: `2px solid ${verdict.color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: verdict.color, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+                          {verdict.icon}
+                        </span>
+                        <div>
+                          <div style={{ fontSize: 17, fontWeight: 700, color: verdict.color, letterSpacing: "0.02em" }}>
+                            {verdict.label}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#4a5870", marginTop: 1 }}>
+                            판정 완료
+                          </div>
+                        </div>
+                      </div>
+                      {typeof result.confidence === 'number' && (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: verdict.color }}>
+                            {Math.round(result.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span>
+                          </div>
+                          <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.1em" }}>CONFIDENCE</div>
+                        </div>
+                      )}
+                    </div>
+                    {typeof result.confidence === 'number' && (
+                      <div style={{ padding: "12px 24px 0", background: "#0a0e16" }}>
+                        <div style={{ height: 4, background: "#1a2030", borderRadius: 3, overflow: "hidden" }}>
+                          <div className="confidence-bar-fill" style={{ width: `${result.confidence * 100}%`, background: verdict.color }} />
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ padding: "18px 24px", background: "#0a0e16" }}>
+                      <div style={{ fontSize: 10, color: "#3a4860", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                        REASON
+                      </div>
+                      {result.reason && result.reason.length > 0 ? (
+                        result.reason.map((r, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#8090a8", lineHeight: 1.7 }}>• {r}</div>
+                        ))
+                      ) : (
+                        <div style={{ fontSize: 13, color: "#3a4860" }}>
+                          탐지된 이유 없음
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: "12px 24px", background: "#080b12", borderTop: "1px solid #161c28", display: "flex", gap: 10 }}>
+                      <button onClick={() => { setResult(null); setText(""); setImage(null); setImagePreview(null); }} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #1e2838", background: "transparent", color: "#5a6880", fontSize: 12, fontFamily: "inherit", cursor: "pointer", marginLeft: "auto" }}>
+                        초기화
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
