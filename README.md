@@ -1,5 +1,5 @@
 # Cloud Computing Term Project
-피싱 문자 판별
+스미싱 문자 판별
 Smishing Message Detection
 
 사용자로부터 의심스러운 문자 메시지의 텍스트나 캡처 이미지를 입력받아, AI 파이프라인을 통해 스미싱(피싱) 메시지 여부를 판별해 주는 웹 서비스입니다.
