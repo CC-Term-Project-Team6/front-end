@@ -3,8 +3,8 @@ import { useState, useRef, useEffect } from "react";
 const BASE_URL = "https://smishingdet-functions.azurewebsites.net/api";
 
 const VERDICT = {
-  spam: { label: "스팸 / 피싱", color: "#d93025", bg: "rgba(217,48,37,0.08)", icon: "⚠" },
-  suspicious: { label: "의심", color: "#f29900", bg: "rgba(242,153,0,0.08)", icon: "?" },
+  spam: { label: "스미싱", color: "#d93025", bg: "rgba(217,48,37,0.08)", icon: "⚠" },
+  suspicious: { label: "스팸", color: "#f29900", bg: "rgba(242,153,0,0.08)", icon: "?" },
   normal: { label: "정상", color: "#188038", bg: "rgba(24,128,56,0.08)", icon: "✓" },
 };
 
@@ -22,6 +22,7 @@ export default function SpamDetector() {
   const [imagePreview, setImagePreview] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
+  const [isPublic, setIsPublic] = useState(false);
   const [history, setHistory] = useState([]);
   const [activeHistory, setActiveHistory] = useState(null);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
@@ -31,7 +32,8 @@ export default function SpamDetector() {
     try {
       const res = await fetch(`${BASE_URL}/history`);
       const data = await res.json();
-      setHistory(data.items || []);
+      const publicHistory = (data.items || []).filter(item => item.visibility !== "private");
+      setHistory(publicHistory);
     } catch {
     }
   };
@@ -55,6 +57,7 @@ export default function SpamDetector() {
 
     try {
       let res;
+      const visibility = isPublic ? "public" : "private";
       if (tab === "text") {
         res = await fetch(`${BASE_URL}/analyze`, {
           method: "POST",
@@ -65,6 +68,7 @@ export default function SpamDetector() {
         const formData = new FormData();
         formData.append("type", "image");
         formData.append("file", image);
+        // formData.append("visibility", visibility);
         res = await fetch(`${BASE_URL}/analyze`, {
           method: "POST",
           body: formData,
@@ -88,7 +92,6 @@ export default function SpamDetector() {
 
   const resetAll = () => {
     setResult(null);
-    // setText(""); // Do not reset text on history click
     setImage(null);
     setImagePreview(null);
     setActiveHistory(null);
@@ -347,7 +350,7 @@ export default function SpamDetector() {
                         fontFamily: "'Space Mono', monospace",
                         color: historyVerdict.color,
                       }}>{Math.round(selectedHistoryItem.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span></div>
-                      <div style={{ fontSize: 10, color: `${historyVerdict.color}99`, letterSpacing: "0.1em" }}>CONFIDENCE</div>
+                      <div style={{ fontSize: 10, color: `${historyVerdict.color}99`, letterSpacing: "0.05em", fontWeight: 500 }}>AI 확신도</div>
                     </div>
                   )}
                 </div>
@@ -390,6 +393,16 @@ export default function SpamDetector() {
                     <div style={{ fontSize: 13, color: "#adb5bd" }}>특별한 위험 요소가 탐지되지 않았습니다.</div>
                   )}
                 </div>
+
+                  <div style={{ marginTop: 24, display: "flex", gap: 10 }}>
+                    <a href="https://www.thecall.co.kr/" target="_blank" rel="noreferrer" style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #c8e6c9", background: "#e8f5e9", color: "#1b5e20", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "#c8e6c9"} onMouseOut={e => e.currentTarget.style.background = "#e8f5e9"}>
+                      📞 전화번호 조회하기 (더콜 사이트 연결↗)
+                      
+                    </a>
+                    <a href="https://pf.kakao.com/_xnJVxoxj" target="_blank" rel="noreferrer" style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #FEE500", background: "#fff9c4", color: "#191919", fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "#FEE500"} onMouseOut={e => e.currentTarget.style.background = "#fff9c4"}>
+                      🔗 URL 조회하기 (보호나라 카카오톡 연결↗)
+                    </a>
+                  </div>
               </div>
             ) : (
               <>
@@ -437,13 +450,25 @@ export default function SpamDetector() {
                   </div>
                 )}
 
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, cursor: "pointer", width: "fit-content" }}>
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: "#0d6efd", cursor: "pointer" }}
+                  />
+                  <span style={{ fontSize: 13, color: "#495057" }}>
+                    분석 데이터를 서비스 품질 개선을 위해 수집·공개하는 것에 동의합니다. (비동의 시 비공개 처리)
+                  </span>
+                </label>
+
                 <button className="analyze-btn" onClick={analyze} disabled={analyzing || (tab === "text" ? !text.trim() : !image)}>
                   {analyzing ? "분석 중..." : "분석 시작 →"}
                 </button>
 
                 {analyzing && (
                   <div style={{ marginTop: 24, padding: "20px", background: "#f1f3f5", border: "1px solid #e9ecef", borderRadius: 12, textAlign: "center", color: '#495057' }}>
-                    AI가 분석하고 있습니다...
+                    AI 분석 중 ...
                   </div>
                 )}
 
@@ -468,7 +493,7 @@ export default function SpamDetector() {
                           <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: verdict.color }}>
                             {Math.round(result.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span>
                           </div>
-                          <div style={{ fontSize: 10, color: `${verdict.color}99`, letterSpacing: "0.1em" }}>CONFIDENCE</div>
+                          <div style={{ fontSize: 10, color: `${verdict.color}99`, letterSpacing: "0.05em", fontWeight: 500 }}>AI 확신도</div>
                         </div>
                       )}
                     </div>
@@ -493,8 +518,14 @@ export default function SpamDetector() {
                         </div>
                       )}
                     </div>
-                    <div style={{ padding: "12px 24px", background: "#f8f9fa", borderTop: "1px solid #e9ecef", display: "flex", gap: 10 }}>
-                      <button onClick={() => { setResult(null); setText(""); setImage(null); setImagePreview(null); }} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #ced4da", background: "#ffffff", color: "#6c757d", fontSize: 12, fontFamily: "inherit", cursor: "pointer", marginLeft: "auto" }}>
+                    <div style={{ padding: "12px 24px", background: "#f8f9fa", borderTop: "1px solid #e9ecef", display: "flex", gap: 10, alignItems: "center" }}>
+                      <a href="https://www.thecall.co.kr/" target="_blank" rel="noreferrer" style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #c8e6c9", background: "#e8f5e9", color: "#1b5e20", fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", gap: 4, transition: "background 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "#c8e6c9"} onMouseOut={e => e.currentTarget.style.background = "#e8f5e9"}>
+                        📞 전화번호 조회하기 (더콜 사이트 연결↗)
+                      </a>
+                      <a href="https://pf.kakao.com/_xnJVxoxj" target="_blank" rel="noreferrer" style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #FEE500", background: "#fff9c4", color: "#191919", fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", gap: 4, transition: "background 0.2s" }} onMouseOver={e => e.currentTarget.style.background = "#FEE500"} onMouseOut={e => e.currentTarget.style.background = "#fff9c4"}>
+                        🔗 URL 조회하기 (보호나라 카카오톡 연결↗)
+                      </a>
+                      <button onClick={() => { setResult(null); setText(""); setImage(null); setImagePreview(null); setIsPublic(false); }} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #ced4da", background: "#ffffff", color: "#6c757d", fontSize: 12, fontFamily: "inherit", cursor: "pointer", marginLeft: "auto" }}>
                         초기화
                       </button>
                     </div>
