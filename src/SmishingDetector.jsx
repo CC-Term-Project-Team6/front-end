@@ -15,7 +15,7 @@ function formatTime(iso) {
   return d.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function SpamDetector() {
+export default function SmishingDetector() {
   const [tab, setTab] = useState("text");
   const [text, setText] = useState("");
   const [image, setImage] = useState(null);

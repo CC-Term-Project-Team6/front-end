@@ -1,5 +1,5 @@
-import SpamDetector from './SpamDetector';
+import SmishingDetector from './SmishingDetector';
 
 export default function App() {
-  return <SpamDetector />;
+  return <SmishingDetector />;
 }
