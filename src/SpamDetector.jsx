@@ -248,6 +248,20 @@ export default function SpamDetector() {
             피싱 문자 판별
           </span>
         </div>
+        <div style={{ display: "flex", gap: 20, fontSize: 12, alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDICT.normal.color }}></span>
+            <span style={{ color: "#495057" }}><strong>정상</strong> : 안전 / 일반적인 메시지</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDICT.suspicious.color }}></span>
+            <span style={{ color: "#495057" }}><strong>스팸</strong> : 의심 / 단순 광고, 홍보</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDICT.spam.color }}></span>
+            <span style={{ color: "#495057" }}><strong>스미싱</strong> : 위험 / 악성 해킹, 개인정보 탈취</span>
+          </div>
+        </div>
       </header>
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
