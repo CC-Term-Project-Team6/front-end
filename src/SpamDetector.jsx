@@ -22,6 +22,7 @@ export default function SpamDetector() {
   const [imagePreview, setImagePreview] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
   const [isPublic, setIsPublic] = useState(false);
   const [history, setHistory] = useState([]);
   const [activeHistory, setActiveHistory] = useState(null);
@@ -74,11 +75,17 @@ export default function SpamDetector() {
           body: formData,
         });
       }
+
+      if (!res.ok) {
+        throw new Error(`서버 통신 실패 (상태 코드: ${res.status})`);
+      }
+
       const data = await res.json();
       setResult(data);
       fetchHistory();
     } catch (err) {
       console.error(err);
+      setError(err.message || "알 수 없는 오류가 발생했습니다.");
     } finally {
       setAnalyzing(false);
     }
@@ -92,6 +99,7 @@ export default function SpamDetector() {
 
   const resetAll = () => {
     setResult(null);
+    setError(null);
     setImage(null);
     setImagePreview(null);
     setActiveHistory(null);
@@ -483,6 +491,17 @@ export default function SpamDetector() {
                 {analyzing && (
                   <div style={{ marginTop: 24, padding: "20px", background: "#f1f3f5", border: "1px solid #e9ecef", borderRadius: 12, textAlign: "center", color: '#495057' }}>
                     AI 분석 중 ...
+                  </div>
+                )}
+
+                {error && !analyzing && (
+                  <div className="result-card" style={{ marginTop: 24, padding: "20px", background: "#fff5f5", border: "1px solid #ffc9c9", borderRadius: 12, color: "#c92a2a" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, marginBottom: 8 }}>
+                      <span>⚠️</span> 분석 중 오류가 발생했습니다
+                    </div>
+                    <div style={{ fontSize: 13, opacity: 0.9 }}>
+                      {error}
+                    </div>
                   </div>
                 )}
 
