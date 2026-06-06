@@ -480,7 +480,7 @@ export default function SpamDetector() {
                     style={{ width: 16, height: 16, accentColor: "#0d6efd", cursor: "pointer" }}
                   />
                   <span style={{ fontSize: 13, color: "#495057" }}>
-                    분석 데이터를 서비스 품질 개선을 위해 수집·공개하는 것에 동의합니다. (비동의 시 비공개 처리)
+                    (선택) 분석 데이터를 서비스 품질 개선을 위해 수집·공개하는 것에 동의합니다. (비동의 시 비공개 처리)
                   </span>
                 </label>
 
@@ -490,7 +490,13 @@ export default function SpamDetector() {
 
                 {analyzing && (
                   <div style={{ marginTop: 24, padding: "20px", background: "#f1f3f5", border: "1px solid #e9ecef", borderRadius: 12, textAlign: "center", color: '#495057' }}>
-                    AI 분석 중 ...
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontSize: 14, fontWeight: 500 }}>
+                      <span style={{ fontSize: 18 }}>🔍</span>
+                      AI가 메시지의 악성 패턴 및 위험성을 정밀 분석하고 있습니다...
+                    </div>
+                    <div style={{ fontSize: 12, color: "#868e96", marginTop: 8 }}>
+                      네트워크 상태에 따라 몇 초 정도 소요될 수 있습니다.
+                    </div>
                   </div>
                 )}
 
@@ -539,7 +545,7 @@ export default function SpamDetector() {
                     )}
                     <div style={{ padding: "18px 24px" }}>
                       <div style={{ fontSize: 10, color: "#868e96", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                        REASON
+                        분석 이유
                       </div>
                       {result.reason && result.reason.length > 0 ? (
                         result.reason.map((r, i) => (
