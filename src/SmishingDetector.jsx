@@ -33,7 +33,7 @@ export default function SmishingDetector() {
     try {
       const res = await fetch(`${BASE_URL}/history`);
       const data = await res.json();
-      const publicHistory = (data.items || []).filter(item => item.visibility !== "private");
+      const publicHistory = (data.items || []).filter(item => item.visibility === "public");
       setHistory(publicHistory);
     } catch {
     }
@@ -63,13 +63,13 @@ export default function SmishingDetector() {
         res = await fetch(`${BASE_URL}/analyze`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: text }),
+          body: JSON.stringify({ text: text, visibility }),
         });
       } else {
         const formData = new FormData();
         formData.append("type", "image");
         formData.append("file", image);
-        // formData.append("visibility", visibility);
+        formData.append("visibility", visibility);
         res = await fetch(`${BASE_URL}/analyze`, {
           method: "POST",
           body: formData,
@@ -252,8 +252,12 @@ export default function SmishingDetector() {
         zIndex: 100,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.04em", color: "#212529" }}>
-            피싱 문자 판별
+          <span
+            onClick={() => { resetAll(); setText(""); setIsPublic(false); setTab("text"); }}
+            style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.04em", color: "#212529", cursor: "pointer" }}
+            title="초기 화면으로"
+          >
+            스미싱 문자 판별
           </span>
         </div>
         <div style={{ display: "flex", gap: 20, fontSize: 12, alignItems: "center" }}>
@@ -318,7 +322,7 @@ export default function SmishingDetector() {
                       분석 이력 상세
                     </h1>
                   <button
-                    onClick={() => { setSelectedHistoryItem(null); setActiveHistory(null); }}
+                    onClick={() => { resetAll(); setText(""); setIsPublic(false); setTab("text"); }}
                     style={{
                       padding: "8px 16px",
                       borderRadius: 6,
