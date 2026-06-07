@@ -23,6 +23,7 @@ export default function SmishingDetector() {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [historyError, setHistoryError] = useState(null);
   const [isPublic, setIsPublic] = useState(false);
   const [history, setHistory] = useState([]);
   const [activeHistory, setActiveHistory] = useState(null);
@@ -30,12 +31,18 @@ export default function SmishingDetector() {
   const fileRef = useRef();
 
   const fetchHistory = async () => {
+    setHistoryError(null);
     try {
       const res = await fetch(`${BASE_URL}/history`);
+      if (!res.ok) {
+        throw new Error(`이력 조회 실패 (상태 코드: ${res.status})`);
+      }
       const data = await res.json();
-      const publicHistory = (data.items || []).filter(item => item.visibility === "public");
+      const publicHistory = (data.items || []); //.filter(item => item.visibility === "public");
       setHistory(publicHistory);
-    } catch {
+    } catch (err) {
+      console.error(err);
+      setHistoryError(err.message || "이력 조회 중 오류가 발생했습니다.");
     }
   };
 
@@ -287,10 +294,15 @@ export default function SmishingDetector() {
           <div style={{ fontSize: 10, color: "#6c757d", letterSpacing: "0.12em", fontFamily: "'Space Mono', monospace", marginBottom: 14, fontWeight: 500 }}>
             최근 분석 이력
           </div>
-          {history.length === 0 && (
+          {historyError && (
+            <div style={{ fontSize: 11, color: "#d93025", textAlign: "center", marginTop: 20, lineHeight: 1.5, wordBreak: "keep-all" }}>
+              ⚠️<br />{historyError}
+            </div>
+          )}
+          {!historyError && history.length === 0 && (
             <div style={{ fontSize: 11, color: "#adb5bd", textAlign: "center", marginTop: 20 }}>이력 없음</div>
           )}
-          {history.map(h => {
+          {!historyError && history.map(h => {
             const v = VERDICT[h.label] ?? VERDICT.normal;
             return (
               <div
