@@ -3,9 +3,15 @@ import { useState, useRef, useEffect } from "react";
 const BASE_URL = "https://smishingdet-functions.azurewebsites.net/api";
 
 const VERDICT = {
-  spam: { label: "스미싱", color: "#d93025", bg: "rgba(217,48,37,0.08)", icon: "⚠" },
-  suspicious: { label: "스팸", color: "#f29900", bg: "rgba(242,153,0,0.08)", icon: "?" },
+  smishing: { label: "스미싱", color: "#d93025", bg: "rgba(217,48,37,0.08)", icon: "⚠" },
+  spam: { label: "스팸", color: "#f29900", bg: "rgba(242,153,0,0.08)", icon: "?" },
   normal: { label: "정상", color: "#188038", bg: "rgba(24,128,56,0.08)", icon: "✓" },
+};
+
+const RISK_LEVEL_MAP = {
+  low: "낮음",
+  medium: "중간",
+  high: "높음",
 };
 
 function formatTime(iso) {
@@ -273,11 +279,11 @@ export default function SmishingDetector() {
             <span style={{ color: "#495057" }}><strong>정상</strong> : 안전 / 일반적인 메시지</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDICT.suspicious.color }}></span>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDICT.spam.color }}></span>
             <span style={{ color: "#495057" }}><strong>스팸</strong> : 의심 / 단순 광고, 홍보</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDICT.spam.color }}></span>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDICT.smishing.color }}></span>
             <span style={{ color: "#495057" }}><strong>스미싱</strong> : 위험 / 악성 해킹, 개인정보 탈취</span>
           </div>
         </div>
@@ -380,17 +386,28 @@ export default function SmishingDetector() {
                       </div>
                     </div>
                   </div>
-                  {typeof selectedHistoryItem.confidence === 'number' && (
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{
-                        fontSize: 28,
-                        fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace",
-                        color: historyVerdict.color,
-                      }}>{Math.round(selectedHistoryItem.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span></div>
-                      <div style={{ fontSize: 10, color: `${historyVerdict.color}99`, letterSpacing: "0.05em", fontWeight: 500 }}>AI 확신도</div>
-                    </div>
-                  )}
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 24 }}>
+                    {selectedHistoryItem.risk_level && (
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: historyVerdict.color, lineHeight: 1 }}>
+                          {RISK_LEVEL_MAP[selectedHistoryItem.risk_level?.toLowerCase()] || selectedHistoryItem.risk_level}
+                        </div>
+                        <div style={{ fontSize: 10, color: `${historyVerdict.color}99`, letterSpacing: "0.05em", fontWeight: 500, marginTop: 4 }}>위험도</div>
+                      </div>
+                    )}
+                    {typeof selectedHistoryItem.confidence === 'number' && (
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{
+                          fontSize: 28,
+                          fontWeight: 700,
+                          fontFamily: "'Space Mono', monospace",
+                          color: historyVerdict.color,
+                          lineHeight: 1
+                        }}>{Math.round(selectedHistoryItem.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span></div>
+                        <div style={{ fontSize: 10, color: `${historyVerdict.color}99`, letterSpacing: "0.05em", fontWeight: 500, marginTop: 4 }}>AI 확신도</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Original Text */}
@@ -543,14 +560,24 @@ export default function SmishingDetector() {
                           </div>
                         </div>
                       </div>
-                      {typeof result.confidence === 'number' && (
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: verdict.color }}>
-                            {Math.round(result.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 24 }}>
+                        {result.risk_level && (
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 28, fontWeight: 700, color: verdict.color, lineHeight: 1 }}>
+                              {RISK_LEVEL_MAP[result.risk_level?.toLowerCase()] || result.risk_level}
+                            </div>
+                            <div style={{ fontSize: 10, color: `${verdict.color}99`, letterSpacing: "0.05em", fontWeight: 500, marginTop: 4 }}>위험도</div>
                           </div>
-                          <div style={{ fontSize: 10, color: `${verdict.color}99`, letterSpacing: "0.05em", fontWeight: 500 }}>AI 확신도</div>
-                        </div>
-                      )}
+                        )}
+                        {typeof result.confidence === 'number' && (
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: verdict.color, lineHeight: 1 }}>
+                              {Math.round(result.confidence * 100)}<span style={{ fontSize: 14, opacity: 0.6 }}>%</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: `${verdict.color}99`, letterSpacing: "0.05em", fontWeight: 500, marginTop: 4 }}>AI 확신도</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {typeof result.confidence === 'number' && (
                       <div style={{ padding: "12px 24px 0" }}>
